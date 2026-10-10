@@ -12,25 +12,18 @@
 <meta name="theme-color" content="#06173a">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%2306173a'/%3E%3Cpath d='M30 10 L30 46 L12 46 Z' fill='%23ffffff'/%3E%3Cpath d='M34 16 L34 46 L50 46 Z' fill='%230066FF'/%3E%3Cpath d='M10 50 H54 L48 56 H16 Z' fill='%23FF0000'/%3E%3C/svg%3E">
 <style>
-  /* La page entière est un cadre fixe à la taille exacte de l'écran : aucun défilement latéral possible. */
-  html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #06173a; }
-  .cadre {
-    position: fixed; inset: 0; overflow-x: hidden; overflow-y: auto;
-    -webkit-overflow-scrolling: touch;
-  }
-  /* Astuce iPhone / iPad : Safari élargit les iframes à la taille de leur contenu ;
-     width:1px + min-width:100% force l'iframe à la largeur exacte de l'écran. */
-  iframe { display: block; border: 0; width: 1px; min-width: 100%; max-width: 100%; height: 100%; }
-  @media (prefers-color-scheme: light) { html, body { background: #cddbf3; } }
+  html, body { margin: 0; height: 100%; background: #06173a; }
+  iframe { display: block; width: 100%; height: 100%; border: 0; }
+  .secours { position: fixed; inset: auto 0 0 0; padding: 10px 16px; font: 13px system-ui, sans-serif;
+             color: #c9d4ea; background: #06173a; text-align: center; }
+  .secours a { color: #fff; }
 </style>
 </head>
 <body>
-<div class="cadre">
-  <iframe
-    src="https://script.google.com/macros/s/AKfycbyxU4L9ZTrDNDZ52QFm6lslJdmfzAH3-i_t1KKBQJho8CPOHhWbhprolLJN62jqNz80/exec"
-    title="Grand Prix Dorigny"
-    scrolling="yes"
-    allow="clipboard-write"></iframe>
-</div>
+<iframe
+  src="https://script.google.com/macros/s/AKfycbyxU4L9ZTrDNDZ52QFm6lslJdmfzAH3-i_t1KKBQJho8CPOHhWbhprolLJN62jqNz80/exec"
+  title="Grand Prix Dorigny"
+  allow="clipboard-write"></iframe>
+<noscript><p class="secours">Le site ne s'affiche pas ? <a href="https://script.google.com/macros/s/AKfycbyxU4L9ZTrDNDZ52QFm6lslJdmfzAH3-i_t1KKBQJho8CPOHhWbhprolLJN62jqNz80/exec">Ouvrir directement</a></p></noscript>
 </body>
 </html>
