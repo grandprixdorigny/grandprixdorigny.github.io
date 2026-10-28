@@ -27,17 +27,14 @@
 </style>
 </head>
 <body>
-<iframe
-  src="https://script.google.com/macros/s/AKfycbyxU4L9ZTrDNDZ52QFm6lslJdmfzAH3-i_t1KKBQJho8CPOHhWbhprolLJN62jqNz80/exec"
-  title="Grand Prix Dorigny"
-  allow="clipboard-write"></iframe>
+<iframe id="app" title="Grand Prix Dorigny" allow="clipboard-write"></iframe>
 <script>
-  /* Ouvre directement l'onglet demandé : grandprixdorigny.github.io/#course, #classement ou #inscriptions */
+  /* Un seul chargement, directement sur l'onglet demandé : grandprixdorigny.github.io/#course, #classement ou #inscriptions */
   (function () {
+    var APP = "https://script.google.com/macros/s/AKfycbyxU4L9ZTrDNDZ52QFm6lslJdmfzAH3-i_t1KKBQJho8CPOHhWbhprolLJN62jqNz80/exec";
     var h = (location.hash || "").replace(/[^#a-z]/gi, "");
-    if (["#inscriptions", "#course", "#classement"].indexOf(h) < 0) return;
-    var f = document.querySelector("iframe");
-    f.src = f.src.split("#")[0] + h;
+    if (["#inscriptions", "#course", "#classement"].indexOf(h) < 0) h = "";
+    document.getElementById("app").src = APP + h;
   })();
 </script>
 <noscript><p class="secours">Le site ne s'affiche pas ? <a href="https://script.google.com/macros/s/AKfycbyxU4L9ZTrDNDZ52QFm6lslJdmfzAH3-i_t1KKBQJho8CPOHhWbhprolLJN62jqNz80/exec">Ouvrir directement</a></p></noscript>
