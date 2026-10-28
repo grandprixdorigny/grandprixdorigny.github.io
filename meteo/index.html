@@ -391,6 +391,7 @@ function fmt(ms,opts){return new Intl.DateTimeFormat("fr-CH",Object.assign({time
 function fmtHM(ms){return fmt(ms,{hour:"2-digit",minute:"2-digit"});}
 function fmtDay(ms){return fmt(ms,{weekday:"short",day:"numeric",month:"short"});}
 function fmtFull(ms){return fmtDay(ms)+" · "+fmtHM(ms);}
+function hourOf(ms){return parseInt(fmt(ms,{hour:"2-digit",hourCycle:"h23"}),10);} // « 01 h » en fr-CH
 
 /* ---- unités ---- */
 var BFT=[1,4,7,11,17,22,28,34,41,48,56,64];
@@ -420,16 +421,46 @@ function raceRun(m){
 }
 function dur(ms){if(ms<0)ms=0;var h=Math.floor(ms/3600e3),mn=Math.round((ms%3600e3)/60e3);return (h?h+" h ":"")+mn+" min";}
 function utcH(ms){return new Date(ms).toISOString().slice(11,13)+" UTC";}
+/* heure réelle du run servi par Open-Meteo (meta.json), estimation MeteoSuisse en secours */
+var META={};
+function metaUrl(k){return "https://api.open-meteo.com/data/"+MODELS[k].api+"/static/meta.json";}
+function liveRun(k,now){
+  var m=META[k];
+  if(!m){var r=runInfo(MODELS[k],now);r.est=true;return r;}
+  var lag=m.avail-m.init;
+  return {init:m.init,avail:m.avail,next:m.init+m.every,nextAvail:m.init+m.every+lag,est:false};
+}
+function covers(k){var r=liveRun(k,Date.now());return r.init+MODELS[k].horizon*3600e3>=RACE.end;}
+function coverFrom(k){ // premier run qui couvrira toute la course, et quand il sera servi
+  var m=MODELS[k],every=m.every*3600e3,r=liveRun(k,Date.now());
+  var init=Math.ceil((RACE.end-m.horizon*3600e3)/every)*every;
+  return {init:init,avail:init+(r.avail-r.init)};
+}
 function renderRuns(){
   var now=Date.now();
   ["ch1","ch2"].forEach(function(k){
-    var m=MODELS[k], r=runInfo(m,now);
-    $("run-"+k).innerHTML='<div class="k">'+m.name+' · dernier run</div><div class="v">'+utcH(r.init).replace(" UTC","")+' <small>UTC · '+fmtDay(r.init)+'</small></div><div class="s">suivant dispo ≈ '+fmtHM(r.nextAvail)+'</div>';
+    var m=MODELS[k], r=liveRun(k,now);
+    var nxt=r.nextAvail>now?'suivant attendu ≈ '+fmtHM(r.nextAvail):'suivant attendu d\'un moment à l\'autre';
+    $("run-"+k).innerHTML='<div class="k">'+m.name+' · run '+(r.est?'estimé':'en ligne')+'</div><div class="v">'+utcH(r.init).replace(" UTC","")+' <small>UTC · '+fmtDay(r.init)+'</small></div><div class="s">'+nxt+'</div>';
   });
-  var nx=["ch1","ch2"].map(function(k){return runInfo(MODELS[k],now).nextAvail;}).sort()[0];
-  $("run-next").innerHTML='<div class="k">Prochain rafraîchissement</div><div class="v">'+dur(nx-now)+'</div><div class="s">à '+fmtHM(nx)+' + 10 min de marge</div>';
-  var c1=raceRun(MODELS.ch1), c2=raceRun(MODELS.ch2), ok1=now>=c1.avail, ok2=now>=c2.avail;
-  $("race-cov").innerHTML='<div class="k">Course · dim. 10h–17h</div><div class="v">'+(ok1?"CH1 + CH2":ok2?"CH2 <small>(2 km)</small>":"bientôt")+'</div><div class="s">'+(ok1?"maille 1 km disponible":"CH1 dès "+fmtDay(c1.avail)+" "+fmtHM(c1.avail))+'</div>';
+  var nx=Math.min(liveRun("ch1",now).nextAvail,liveRun("ch2",now).nextAvail);
+  $("run-next").innerHTML='<div class="k">Prochain rafraîchissement</div><div class="v">'+(nx>now?dur(nx-now):"imminent")+'</div><div class="s">contrôle automatique toutes les 10 min</div>';
+  var ok1=covers("ch1"), ok2=covers("ch2"), f1=coverFrom("ch1"), f2=coverFrom("ch2");
+  var v=ok1?"CH1 + CH2":ok2?"CH2 <small>(2 km)</small>":"partielle";
+  var sub=ok1?"maille 1 km disponible":(ok2?"":"CH2 complète ≈ "+fmtDay(f2.avail)+" "+fmtHM(f2.avail)+" · ")+"CH1 ≈ "+fmtDay(f1.avail)+" "+fmtHM(f1.avail);
+  $("race-cov").innerHTML='<div class="k">Course · dim. 10h–17h</div><div class="v">'+v+'</div><div class="s">'+sub+'</div>';
+}
+var loadedInit={};
+function loadMeta(){
+  return Promise.all(["ch1","ch2"].map(function(k){
+    return fetch(metaUrl(k)).then(function(r){return r.json();}).then(function(j){
+      META[k]={init:j.last_run_initialisation_time*1000,avail:j.last_run_availability_time*1000,every:(j.update_interval_seconds||MODELS[k].every*3600)*1000};
+    }).catch(function(){});
+  })).then(function(){
+    renderRuns();
+    var k=state.model; // nouveau run servi pour le modèle affiché : on recharge
+    if(META[k]&&loadedInit[k]&&META[k].init>loadedInit[k]&&typeof show_==="function"){loadedAt[k]=0;show_(k,curTime());}
+  });
 }
 /* ---- données d'exemple : bise qui s'installe ---- */
 function demo(modelKey){
@@ -672,7 +703,7 @@ function drawChart(){
   for(var v=0;v<=maxK;v+=5){svgEl("line",{x1:L,x2:W-R,y1:ys(v),y2:ys(v),stroke:"var(--line)","stroke-width":1},s);
     var tl=svgEl("text",{x:L-8,y:ys(v)+4,"text-anchor":"end",fill:"var(--muted)","font-family":"IBM Plex Mono, monospace","font-size":11},s);tl.textContent=show(v);}
   // jours / heures
-  c.t.forEach(function(t,k){var hh=+fmt(t,{hour:"numeric",hourCycle:"h23"});
+  c.t.forEach(function(t,k){var hh=hourOf(t);
     if(hh===0){svgEl("line",{x1:xs(k),x2:xs(k),y1:T-6,y2:Hh-B,stroke:"var(--muted)","stroke-width":1,"stroke-dasharray":"2 3"},s);}
     if(hh%6===0){var tx=svgEl("text",{x:xs(k),y:Hh-B+16,"text-anchor":"middle",fill:"var(--muted)","font-family":"IBM Plex Mono, monospace","font-size":11},s);tx.textContent=hh===0?fmt(t,{weekday:"short",day:"numeric"}):hh+"h";}
   });
@@ -721,7 +752,7 @@ function renderSource(loading){
 /* bande des jours, comme la bande horaire de l'onglet Course */
 function renderStrip(){
   var d=cur(); if(!d)return; var c=d.pts[state.pt]||d.pts[0], days={}, order=[];
-  c.t.forEach(function(t,k){var key=fmtDay(t);if(!days[key]){days[key]={k:k,max:0,noon:k};order.push(key);}var hh=+fmt(t,{hour:"numeric",hourCycle:"h23"});if(hh>=8&&hh<=18&&c.ws[k]!=null)days[key].max=Math.max(days[key].max,c.ws[k]);if(hh===12)days[key].noon=k;});
+  c.t.forEach(function(t,k){var key=fmtDay(t);if(!days[key]){days[key]={k:k,max:0,noon:k};order.push(key);}var hh=hourOf(t);if(hh>=8&&hh<=18&&c.ws[k]!=null)days[key].max=Math.max(days[key].max,c.ws[k]);if(hh===12)days[key].noon=k;});
   var race=fmtDay(RACE_T);
   $("strip").innerHTML=order.map(function(key){var o=days[key];return '<li data-k="'+o.noon+'" data-day="'+key+'" class="'+(key===race?"race":"")+'"><span>'+(key===race?"Course · ":"")+key+'</span><b>'+(o.max?"max "+show(o.max)+" "+unitLabel():"–")+'</b></li>';}).join("");
   markStrip();
@@ -740,13 +771,13 @@ function msg(t,cls){$("msg").textContent=t;$("msg").className="msg "+(cls||"");}
 
 /* chargement direct du dernier run, par modèle, avec cache tant qu'aucun run plus récent n'est sorti */
 var loadedAt={}, pending={}, timer=null;
-function fresh(k){var r=runInfo(MODELS[k],Date.now());return loadedAt[k]&&loadedAt[k]>r.avail+10*60e3&&Date.now()-loadedAt[k]<3*3600e3;}
+function fresh(k){if(!loadedAt[k])return false;if(META[k])return loadedInit[k]>=META[k].init;return Date.now()-loadedAt[k]<30*60e3;}
 function ensure(k){
   if(state.source[k]&&state.source[k]!=="demo"&&fresh(k))return Promise.resolve(true);
   if(pending[k])return pending[k];
   $("m-"+k).setAttribute("aria-busy","true");
   pending[k]=fetch(apiUrl(k)).then(function(r){if(!r.ok)throw new Error("HTTP "+r.status);return r.json();})
-    .then(function(j){if(j&&j.error)throw new Error(j.reason);state.data[k]=parseOM(j);state.source[k]="chargé à "+fmtHM(Date.now());loadedAt[k]=Date.now();return true;})
+    .then(function(j){if(j&&j.error)throw new Error(j.reason);state.data[k]=parseOM(j);loadedAt[k]=Date.now();loadedInit[k]=META[k]?META[k].init:0;state.source[k]=(META[k]?"run de "+utcH(META[k].init)+" · ":"")+"chargé à "+fmtHM(Date.now());return true;})
     .catch(function(){if(!state.data[k]){state.data[k]=demo(k);state.source[k]="demo";}return false;})
     .then(function(ok){pending[k]=null;$("m-"+k).removeAttribute("aria-busy");scheduleNext();return ok;});
   return pending[k];
@@ -762,21 +793,14 @@ function show_(k,target){ // affiche le modèle k une fois chargé, à l'heure v
     return ok;
   });
 }
-function scheduleNext(){
-  if(timer)clearTimeout(timer);
-  var nx=Math.min(runInfo(MODELS.ch1,Date.now()).nextAvail,runInfo(MODELS.ch2,Date.now()).nextAvail);
-  timer=setTimeout(function(){loadedAt={};show_(state.model,curTime());},Math.max(60e3,nx+10*60e3-Date.now()));
-}
-function raceModel(){ // CH1 si son run couvre déjà la course, sinon CH2
-  return Date.now()>=raceRun(MODELS.ch1).avail?"ch1":"ch2";
-}
+function scheduleNext(){} // remplacé par le contrôle de meta.json toutes les 10 min
+function raceModel(){return covers("ch1")?"ch1":"ch2";} // CH1 si son run couvre déjà la course, sinon CH2
 
 $("m-ch1").onclick=function(){show_("ch1",curTime());};
 $("m-ch2").onclick=function(){show_("ch2",curTime());};
 $("go-race").onclick=function(){
   var k=state.model;
-  var covered=k==="ch1"?Date.now()>=raceRun(MODELS.ch1).avail:Date.now()>=raceRun(MODELS.ch2).avail;
-  show_(covered?k:raceModel(),RACE_T);
+  show_(covers(k)?k:raceModel(),RACE_T);
 };
 $("go-now").onclick=function(){setIdx(nearest(Date.now()));};
 $("strip").addEventListener("click",function(e){var li=e.target.closest("li[data-k]");if(li)setIdx(+li.dataset.k);});
@@ -806,7 +830,8 @@ $("map-hint").textContent=GRID.length+" sondes · "+GRID.filter(function(p){retu
 renderRuns(); setInterval(renderRuns,60e3);
 state.data.ch1=demo("ch1");state.source.ch1="demo";
 renderAll(null);
-show_("ch1",null); // démarrage : dernier run ICON-CH1
+loadMeta().then(function(){show_("ch1",null);}); // démarrage : heure réelle des runs, puis dernier run ICON-CH1
+setInterval(loadMeta,10*60e3);
 })();
 </script>
 
