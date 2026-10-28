@@ -374,10 +374,10 @@ var SHORE=[[6.55155,46.50804],[6.5521,46.508],[6.55266,46.50751],[6.55322,46.507
 function shoreLat(lon){for(var i=0;i<SHORE.length-1;i++){var a=SHORE[i],b=SHORE[i+1];if(lon>=a[0]&&lon<=b[0])return a[1]+(b[1]-a[1])*(lon-a[0])/(b[0]-a[0]);}return SHORE[lon<SHORE[0][0]?0:SHORE.length-1][1];}
 function lineLat(lon){return PIER_TIP.lat+(OUCHY.lat-PIER_TIP.lat)*(lon-PIER_TIP.lon)/(OUCHY.lon-PIER_TIP.lon);}
 /* sondes : rangées serrées dans la baie (au nord de la ligne), plus deux rangées au large ; seulement sur l'eau */
-var ROWS=[46.5178,46.5146,46.5114,46.5082,46.5054], COLS_LON=[6.5615,6.5670,6.5725,6.5780,6.5835,6.5890,6.5945,6.6000];
+var ROWS=[46.5172,46.5132,46.5092,46.5056], COLS_LON=[6.5620,6.5685,6.5750,6.5815,6.5880,6.5945];
 var GRID=[];
 ROWS.forEach(function(la){COLS_LON.forEach(function(lo){if(la<shoreLat(lo)-0.0007)GRID.push({lat:la,lon:lo,bay:la>lineLat(lo)});});});
-var CI=0;(function(){var b=1e9;GRID.forEach(function(p,i){var d=Math.abs(p.lat-46.5146)+Math.abs(p.lon-6.5780);if(d<b){b=d;CI=i;}});})();
+var CI=0;(function(){var b=1e9;GRID.forEach(function(p,i){var d=Math.abs(p.lat-46.5132)+Math.abs(p.lon-6.5815);if(d<b){b=d;CI=i;}});})();
 
 var RACE={start:Date.UTC(2026,10,1,9,0),end:Date.UTC(2026,10,1,16,0)}; // 10h–17h heure suisse (UTC+1)
 var MODELS={
